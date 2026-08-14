@@ -1,0 +1,317 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String
+  avatar        String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  wallets       Wallet[]
+  sharedWallets SharedWalletMember[]
+  transactions  Transaction[]
+  investments   Investment[]
+  budgets       Budget[]
+  goals         Goal[]
+  alerts        Alert[]
+  reports       Report[]
+  auditLogs     AuditLog[]
+  apiKeys       ApiKey[]
+  chatMessages  ChatMessage[]
+  coupleInvitesSent     CoupleInvite[] @relation("Inviter")
+  coupleInvitesReceived CoupleInvite[] @relation("Invitee")
+  coupleAsUser1 CoupleRelation[] @relation("User1")
+  coupleAsUser2 CoupleRelation[] @relation("User2")
+
+  @@map("users")
+}
+
+model Wallet {
+  id          String   @id @default(cuid())
+  name        String
+  type        String
+  balance     Decimal  @default(0) @db.Decimal(15, 2)
+  currency    String   @default("BRL")
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  transactions Transaction[]
+  sharedAs     SharedWallet[]
+
+  @@map("wallets")
+}
+
+model SharedWallet {
+  id          String   @id @default(cuid())
+  walletId    String   @unique
+  wallet      Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     SharedWalletMember[]
+  transactions Transaction[]
+
+  @@map("shared_wallets")
+}
+
+model SharedWalletMember {
+  id             String       @id @default(cuid())
+  sharedWalletId String
+  sharedWallet   SharedWallet @relation(fields: [sharedWalletId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           String       @default("member")
+  joinedAt       DateTime     @default(now())
+
+  @@unique([sharedWalletId, userId])
+  @@map("shared_wallet_members")
+}
+
+model CoupleInvite {
+  id           String   @id @default(cuid())
+  inviterId    String
+  inviter      User     @relation("Inviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  inviteeEmail String
+  inviteeId    String?
+  status       String   @default("pending")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("couple_invites")
+}
+
+model CoupleRelation {
+  id        String   @id @default(cuid())
+  user1Id   String
+  user2Id   String
+  user1     User     @relation("User1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2     User     @relation("User2", fields: [user2Id], references: [id], onDelete: Cascade)
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  endedAt   DateTime?
+
+  @@unique([user1Id, user2Id])
+  @@map("couple_relations")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  type        String
+  color       String   @default("#3b82f6")
+  icon        String?
+  userId      String?
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  transactions Transaction[]
+  budgets      Budget[]
+
+  @@map("categories")
+}
+
+model Transaction {
+  id             String        @id @default(cuid())
+  amount         Decimal       @db.Decimal(15, 2)
+  type           String
+  description    String?
+  date           DateTime      @default(now())
+  status         String        @default("completed")
+
+  walletId       String?
+  wallet         Wallet?       @relation(fields: [walletId], references: [id], onDelete: SetNull)
+  sharedWalletId String?
+  sharedWallet   SharedWallet? @relation(fields: [sharedWalletId], references: [id], onDelete: SetNull)
+
+  categoryId     String?
+  category       Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  isRecurring    Boolean       @default(false)
+  recurringFreq  String?
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@map("transactions")
+}
+
+model Investment {
+  id          String   @id @default(cuid())
+  name        String
+  type        String
+  ticker      String?
+  quantity    Decimal  @default(0) @db.Decimal(15, 8)
+  avgPrice    Decimal  @default(0) @db.Decimal(15, 2)
+  currentPrice Decimal @default(0) @db.Decimal(15, 2)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  assetTransactions AssetTransaction[]
+
+  @@map("investments")
+}
+
+model AssetTransaction {
+  id           String     @id @default(cuid())
+  type         String
+  quantity     Decimal    @db.Decimal(15, 8)
+  price        Decimal    @db.Decimal(15, 2)
+  date         DateTime   @default(now())
+  investmentId String
+  investment   Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@map("asset_transactions")
+}
+
+model Budget {
+  id          String   @id @default(cuid())
+  name        String
+  amount      Decimal  @db.Decimal(15, 2)
+  spent       Decimal  @default(0) @db.Decimal(15, 2)
+  period      String   @default("monthly")
+  startDate   DateTime
+  endDate     DateTime?
+
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("budgets")
+}
+
+model Goal {
+  id          String   @id @default(cuid())
+  name        String
+  targetAmount Decimal @db.Decimal(15, 2)
+  currentAmount Decimal @default(0) @db.Decimal(15, 2)
+  deadline    DateTime?
+  status      String   @default("active")
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  milestones GoalMilestone[]
+
+  @@map("goals")
+}
+
+model GoalMilestone {
+  id          String   @id @default(cuid())
+  name        String
+  amount      Decimal  @db.Decimal(15, 2)
+  reached     Boolean  @default(false)
+  reachedAt   DateTime?
+  goalId      String
+  goal        Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@map("goal_milestones")
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  type        String
+  periodStart DateTime
+  periodEnd   DateTime
+  data        Json
+  insights    String?
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@map("reports")
+}
+
+model Alert {
+  id          String   @id @default(cuid())
+  type        String
+  title       String
+  message     String
+  read        Boolean  @default(false)
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@map("alerts")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String
+  entity      String
+  entityId    String?
+  oldValue    Json?
+  newValue    Json?
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+model ApiKey {
+  id          String   @id @default(cuid())
+  name        String
+  key         String   @unique
+  lastUsed    DateTime?
+  expiresAt   DateTime?
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@map("api_keys")
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  role      String
+  content   String
+  context   Json?
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@map("chat_messages")
+}
+
+model ExchangeRate {
+  id        String   @id @default(cuid())
+  from      String
+  to        String
+  rate      Decimal  @db.Decimal(15, 6)
+  date      DateTime @default(now())
+
+  @@unique([from, to, date])
+  @@map("exchange_rates")
+}
