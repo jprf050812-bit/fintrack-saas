@@ -83,7 +83,7 @@ model SharedWalletMember {
 
 model CoupleInvite {
   id           String   @id @default(cuid())
-  inviterId    String
+  inviterId    String   invitee User? @relation("Invitee", fields: [inviteeId], references: [id])
   inviter      User     @relation("Inviter", fields: [inviterId], references: [id], onDelete: Cascade)
   inviteeEmail String
   inviteeId    String?
