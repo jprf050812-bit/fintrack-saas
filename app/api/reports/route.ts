@@ -21,33 +21,35 @@ export async function GET() {
     months.push({ start, end, label: MONTH_LABELS[start.getMonth()] })
   }
 
-  const monthlyData = await Promise.all(
-    months.map(async ({ start, end, label }) => {
-      const [income, expense] = await Promise.all([
-        prisma.transaction.aggregate({
-          where: { userId: { in: ids }, type: "income", date: { gte: start, lt: end } },
-          _sum: { amount: true },
-        }),
-        prisma.transaction.aggregate({
-          where: { userId: { in: ids }, type: "expense", date: { gte: start, lt: end } },
-          _sum: { amount: true },
-        }),
-      ])
-      return {
-        month: label,
-        income: Number(income._sum.amount || 0),
-        expense: Number(expense._sum.amount || 0),
-      }
-    })
-  )
+  // One query for the whole 8-month window, bucketed in memory
+  // (was 16 separate aggregate queries).
+  const rangeStart = months[0].start
+  const rows = await prisma.transaction.findMany({
+    where: { userId: { in: ids }, date: { gte: rangeStart } },
+    select: { amount: true, type: true, date: true },
+  })
+
+  const monthlyData = months.map(({ start, end, label }) => ({
+    month: label,
+    income: 0,
+    expense: 0,
+    _start: start.getTime(),
+    _end: end.getTime(),
+  }))
+  for (const r of rows) {
+    const t = new Date(r.date).getTime()
+    const bucket = monthlyData.find((m) => t >= m._start && t < m._end)
+    if (!bucket) continue
+    if (r.type === "income") bucket.income += Number(r.amount)
+    else if (r.type === "expense") bucket.expense += Number(r.amount)
+  }
 
   // Heat map: total expense per weekday for the last 8 weeks
   const eightWeeksAgo = new Date(now)
   eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 56)
-  const recentExpenses = await prisma.transaction.findMany({
-    where: { userId: { in: ids }, type: "expense", date: { gte: eightWeeksAgo } },
-    select: { amount: true, date: true },
-  })
+  const recentExpenses = rows.filter(
+    (r) => r.type === "expense" && new Date(r.date) >= eightWeeksAgo
+  )
 
   const weekdayLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
   const heatmap = weekdayLabels.map((day) => ({ day, total: 0 }))
@@ -87,5 +89,9 @@ export async function GET() {
     insights.push("Ainda não há transações suficientes este mês para gerar insights. Adicione algumas transações para ver análises aqui.")
   }
 
-  return NextResponse.json({ monthlyData, heatmap, insights })
+  return NextResponse.json({
+    monthlyData: monthlyData.map(({ month, income, expense }) => ({ month, income, expense })),
+    heatmap,
+    insights,
+  })
 }

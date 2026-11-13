@@ -39,7 +39,7 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6 pb-20 md:pb-0">
-      <h1 className="text-3xl font-bold tracking-tight">Relatórios</h1>
+      <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Relatórios</h1>
 
       <Card>
         <CardHeader>

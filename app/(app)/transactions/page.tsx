@@ -123,7 +123,7 @@ export default function TransactionsPage() {
   return (
     <div className="space-y-6 pb-20 md:pb-0">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">Transações</h1>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Transações</h1>
         <div className="flex gap-2">
           <Button variant="outline" onClick={exportCSV}>
             <Download className="mr-2 h-4 w-4" />

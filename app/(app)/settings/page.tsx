@@ -63,7 +63,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 pb-20 md:pb-0">
-      <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
+      <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Configurações</h1>
 
       <div className="grid gap-6 max-w-2xl">
         <Card>

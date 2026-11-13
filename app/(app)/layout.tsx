@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { authOptions } from "@/lib/auth"
 import { Sidebar } from "@/components/sidebar"
 import { MobileNav } from "@/components/mobile-nav"
-import { Chatbot } from "@/components/chatbot"
+import { ChatbotLazy } from "@/components/chatbot-lazy"
 import { ScopeToggle } from "@/components/scope-toggle"
 import { getPartner, getScope } from "@/lib/scope"
 
@@ -34,7 +34,7 @@ export default async function AppLayout({
         )}
         <main className="flex-1 overflow-y-auto p-4 md:p-8">{children}</main>
       </div>
-      <Chatbot />
+      <ChatbotLazy />
     </div>
   )
 }

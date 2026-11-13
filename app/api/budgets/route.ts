@@ -31,31 +31,28 @@ export async function GET() {
   const start = new Date(now.getFullYear(), now.getMonth(), 1)
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 1)
 
-  const result = await Promise.all(
-    budgets.map(async (b) => {
-      let spent = 0
-      if (b.categoryId) {
-        const agg = await prisma.transaction.aggregate({
-          where: {
-            userId: { in: ids },
-            type: "expense",
-            categoryId: b.categoryId,
-            date: { gte: start, lt: end },
-          },
-          _sum: { amount: true },
-        })
-        spent = Number(agg._sum.amount || 0)
-      }
-      return {
-        id: b.id,
-        name: b.name,
-        amount: Number(b.amount),
-        spent,
-        period: b.period,
-        category: b.category?.name || null,
-      }
-    })
+  const grouped = await prisma.transaction.groupBy({
+    by: ["categoryId"],
+    where: {
+      userId: { in: ids },
+      type: "expense",
+      categoryId: { not: null },
+      date: { gte: start, lt: end },
+    },
+    _sum: { amount: true },
+  })
+  const spentByCategory = new Map(
+    grouped.map((g) => [g.categoryId, Number(g._sum.amount || 0)])
   )
+
+  const result = budgets.map((b) => ({
+    id: b.id,
+    name: b.name,
+    amount: Number(b.amount),
+    spent: b.categoryId ? spentByCategory.get(b.categoryId) || 0 : 0,
+    period: b.period,
+    category: b.category?.name || null,
+  }))
 
   return NextResponse.json({ budgets: result })
 }

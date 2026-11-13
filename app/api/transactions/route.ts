@@ -15,7 +15,7 @@ const createSchema = z.object({
   status: z.enum(["completed", "pending"]).optional(),
 })
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
@@ -26,7 +26,7 @@ export async function GET() {
     where: { userId: { in: ids } },
     include: { category: true, user: { select: { name: true } } },
     orderBy: { date: "desc" },
-    take: 200,
+    take: Math.min(Number(req.nextUrl.searchParams.get("limit")) || 200, 200),
   })
 
   return NextResponse.json({

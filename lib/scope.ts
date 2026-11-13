@@ -1,9 +1,10 @@
+import { cache } from "react"
 import { cookies } from "next/headers"
 import { prisma } from "@/lib/prisma"
 
 export const SCOPE_COOKIE = "fintrack_scope"
 
-export async function getPartner(userId: string) {
+export const getPartner = cache(async (userId: string) => {
   const rel = await prisma.coupleRelation.findFirst({
     where: { status: "active", OR: [{ user1Id: userId }, { user2Id: userId }] },
     include: {
@@ -13,7 +14,7 @@ export async function getPartner(userId: string) {
   })
   if (!rel) return null
   return rel.user1Id === userId ? rel.user2 : rel.user1
-}
+})
 
 // Returns the user ids whose data should be shown: just the user, or the
 // user + partner when the "Casal" view is on and an active relation exists.

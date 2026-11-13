@@ -43,7 +43,7 @@ export default function DashboardPage() {
   useEffect(() => {
     Promise.all([
       fetch("/api/dashboard").then((r) => r.json()),
-      fetch("/api/transactions").then((r) => r.json()),
+      fetch("/api/transactions?limit=5").then((r) => r.json()),
       fetch("/api/alerts").then((r) => r.json()),
       fetch("/api/reports").then((r) => r.json()),
       fetch("/api/investments").then((r) => r.json()),
@@ -94,7 +94,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6 pb-20 md:pb-0">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Dashboard</h1>
         <Link href="/transactions">
           <Button>
             <ArrowUpRight className="mr-2 h-4 w-4" />
