@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getScope } from "@/lib/scope"
 
 const MONTH_LABELS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
 
@@ -10,7 +11,7 @@ export async function GET() {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
   }
-  const userId = session.user.id
+  const { ids } = await getScope(session.user.id)
 
   const now = new Date()
   const months: { start: Date; end: Date; label: string }[] = []
@@ -24,11 +25,11 @@ export async function GET() {
     months.map(async ({ start, end, label }) => {
       const [income, expense] = await Promise.all([
         prisma.transaction.aggregate({
-          where: { userId, type: "income", date: { gte: start, lt: end } },
+          where: { userId: { in: ids }, type: "income", date: { gte: start, lt: end } },
           _sum: { amount: true },
         }),
         prisma.transaction.aggregate({
-          where: { userId, type: "expense", date: { gte: start, lt: end } },
+          where: { userId: { in: ids }, type: "expense", date: { gte: start, lt: end } },
           _sum: { amount: true },
         }),
       ])
@@ -44,7 +45,7 @@ export async function GET() {
   const eightWeeksAgo = new Date(now)
   eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 56)
   const recentExpenses = await prisma.transaction.findMany({
-    where: { userId, type: "expense", date: { gte: eightWeeksAgo } },
+    where: { userId: { in: ids }, type: "expense", date: { gte: eightWeeksAgo } },
     select: { amount: true, date: true },
   })
 

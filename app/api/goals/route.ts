@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { z } from "zod"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getScope } from "@/lib/scope"
 
 const createSchema = z.object({
   name: z.string().min(1).max(120),
@@ -17,8 +18,9 @@ export async function GET() {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
   }
 
+  const { ids } = await getScope(session.user.id)
   const goals = await prisma.goal.findMany({
-    where: { userId: session.user.id },
+    where: { userId: { in: ids } },
     orderBy: { createdAt: "desc" },
   })
 

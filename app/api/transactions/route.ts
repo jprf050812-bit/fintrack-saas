@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { z } from "zod"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getScope } from "@/lib/scope"
 
 const createSchema = z.object({
   description: z.string().max(200).optional(),
@@ -20,9 +21,10 @@ export async function GET() {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
   }
 
+  const { ids, shared } = await getScope(session.user.id)
   const transactions = await prisma.transaction.findMany({
-    where: { userId: session.user.id },
-    include: { category: true },
+    where: { userId: { in: ids } },
+    include: { category: true, user: { select: { name: true } } },
     orderBy: { date: "desc" },
     take: 200,
   })
@@ -37,6 +39,8 @@ export async function GET() {
       date: t.date,
       category: t.category?.name || "Sem categoria",
       categoryColor: t.category?.color || "#6b7280",
+      isMine: t.userId === session.user.id,
+      owner: shared ? t.user?.name || "Parceiro(a)" : null,
     })),
   })
 }
@@ -57,7 +61,25 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const { description, amount, type, categoryId, walletId, date, status } = parsed.data
+  const { description, amount, type, categoryId, date, status } = parsed.data
+
+  // Use the given wallet (only if it is the user's) or fall back to the
+  // user's first wallet, creating one if needed, so balances always update.
+  let wallet = parsed.data.walletId
+    ? await prisma.wallet.findFirst({ where: { id: parsed.data.walletId, userId: session.user.id } })
+    : null
+  if (!wallet) {
+    wallet = await prisma.wallet.findFirst({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: "asc" },
+    })
+  }
+  if (!wallet) {
+    wallet = await prisma.wallet.create({
+      data: { name: "Carteira Principal", type: "checking", balance: 0, userId: session.user.id },
+    })
+  }
+  const walletId = wallet.id
 
   const transaction = await prisma.transaction.create({
     data: {

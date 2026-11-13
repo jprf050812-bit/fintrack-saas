@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { z } from "zod"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getScope } from "@/lib/scope"
 
 const createSchema = z.object({
   name: z.string().min(1).max(120),
@@ -16,10 +17,10 @@ export async function GET() {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
   }
-  const userId = session.user.id
+  const { ids } = await getScope(session.user.id)
 
   const budgets = await prisma.budget.findMany({
-    where: { userId },
+    where: { userId: { in: ids } },
     include: { category: true },
     orderBy: { createdAt: "desc" },
   })
@@ -36,7 +37,7 @@ export async function GET() {
       if (b.categoryId) {
         const agg = await prisma.transaction.aggregate({
           where: {
-            userId,
+            userId: { in: ids },
             type: "expense",
             categoryId: b.categoryId,
             date: { gte: start, lt: end },

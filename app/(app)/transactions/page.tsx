@@ -19,6 +19,8 @@ interface Transaction {
   categoryColor: string
   date: string
   status: string
+  isMine?: boolean
+  owner?: string | null
 }
 
 interface Category {
@@ -183,7 +185,14 @@ export default function TransactionsPage() {
                   {filtered.map((t) => (
                     <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                       <td className="py-3">{formatDate(t.date)}</td>
-                      <td className="py-3 font-medium">{t.description || "-"}</td>
+                      <td className="py-3 font-medium">
+                        {t.description || "-"}
+                        {t.owner && (
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">
+                            ({t.isMine ? "você" : t.owner})
+                          </span>
+                        )}
+                      </td>
                       <td className="py-3">
                         <Badge variant="outline">{t.category}</Badge>
                       </td>
@@ -201,6 +210,7 @@ export default function TransactionsPage() {
                         </Badge>
                       </td>
                       <td className="py-3 text-right">
+                        {t.isMine !== false && (
                         <button
                           onClick={() => handleDelete(t.id)}
                           className="text-gray-400 hover:text-red-600 transition-colors"
@@ -208,6 +218,7 @@ export default function TransactionsPage() {
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
+                        )}
                       </td>
                     </tr>
                   ))}

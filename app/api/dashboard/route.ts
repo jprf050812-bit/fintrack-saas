@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getScope } from "@/lib/scope"
 
 function monthRange(offset = 0) {
   const now = new Date()
@@ -20,11 +21,11 @@ export async function GET() {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
   }
-  const userId = session.user.id
+  const { ids } = await getScope(session.user.id)
 
   const [wallets, investments] = await Promise.all([
-    prisma.wallet.findMany({ where: { userId } }),
-    prisma.investment.findMany({ where: { userId } }),
+    prisma.wallet.findMany({ where: { userId: { in: ids } } }),
+    prisma.investment.findMany({ where: { userId: { in: ids } } }),
   ])
 
   const totalBalance = wallets.reduce((acc, w) => acc + Number(w.balance), 0)
@@ -42,19 +43,19 @@ export async function GET() {
 
   const [incomeThis, expenseThis, incomeLast, expenseLast] = await Promise.all([
     prisma.transaction.aggregate({
-      where: { userId, type: "income", date: { gte: thisMonth.start, lt: thisMonth.end } },
+      where: { userId: { in: ids }, type: "income", date: { gte: thisMonth.start, lt: thisMonth.end } },
       _sum: { amount: true },
     }),
     prisma.transaction.aggregate({
-      where: { userId, type: "expense", date: { gte: thisMonth.start, lt: thisMonth.end } },
+      where: { userId: { in: ids }, type: "expense", date: { gte: thisMonth.start, lt: thisMonth.end } },
       _sum: { amount: true },
     }),
     prisma.transaction.aggregate({
-      where: { userId, type: "income", date: { gte: lastMonth.start, lt: lastMonth.end } },
+      where: { userId: { in: ids }, type: "income", date: { gte: lastMonth.start, lt: lastMonth.end } },
       _sum: { amount: true },
     }),
     prisma.transaction.aggregate({
-      where: { userId, type: "expense", date: { gte: lastMonth.start, lt: lastMonth.end } },
+      where: { userId: { in: ids }, type: "expense", date: { gte: lastMonth.start, lt: lastMonth.end } },
       _sum: { amount: true },
     }),
   ])
