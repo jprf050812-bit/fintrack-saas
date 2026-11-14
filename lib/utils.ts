@@ -5,7 +5,14 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// Set by PrivacyProvider so every formatted money value can be masked.
+let valuesHidden = false
+export function setValuesHidden(hidden: boolean) {
+  valuesHidden = hidden
+}
+
 export function formatCurrency(value: number, currency = 'BRL') {
+  if (valuesHidden) return 'R$ ••••'
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency,
