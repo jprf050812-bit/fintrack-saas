@@ -181,3 +181,45 @@ export function serializeTransaction(t: any, myId: string, shared: boolean) {
     owner: shared ? t.user?.name || "Parceiro(a)" : null,
   }
 }
+
+// Creates one ordinary (non-installment, non-recurring) transaction and keeps
+// the wallet balance in sync. Used by the assistant's confirmation step.
+export async function createSingleTransaction(
+  userId: string,
+  d: {
+    type: "income" | "expense"
+    amount: number
+    description?: string | null
+    categoryId?: string | null
+    date: Date
+    walletId?: string | null
+    paymentMethod?: string | null
+    notes?: string | null
+  }
+) {
+  const wallet = await resolveWallet(userId, d.walletId)
+  const status = statusForDate(d.date)
+  return prisma.$transaction(async (db) => {
+    const tx = await db.transaction.create({
+      data: {
+        userId,
+        type: d.type,
+        amount: d.amount,
+        description: d.description || null,
+        categoryId: d.categoryId || null,
+        walletId: wallet.id,
+        paymentMethod: d.paymentMethod || null,
+        notes: d.notes || null,
+        date: d.date,
+        status,
+      },
+    })
+    if (status === "completed") {
+      await db.wallet.update({
+        where: { id: wallet.id },
+        data: { balance: { increment: signedAmount(d.type, d.amount) } },
+      })
+    }
+    return tx
+  })
+}

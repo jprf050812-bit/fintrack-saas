@@ -2,17 +2,14 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getScope } from "@/lib/scope"
+import { brToday, syncDue } from "@/lib/finance"
+import { basicReply, type AssistantReply } from "@/lib/assistant/basic"
+import { aiConfigured, aiReply } from "@/lib/assistant/llm"
 
-const responses: Record<string, string> = {
-  "oi": "Olá! Sou o FinBot, seu assistente financeiro. Como posso ajudar?",
-  "investir": "Recomendo começar com fundo de emergência (3-6x renda) e diversificar entre renda fixa e variável.",
-  "orçamento": "Tente a regra 50/30/20: 50% necessidades, 30% desejos, 20% poupança/investimentos.",
-  "dívida": "Priorize quitar dívidas com juros >1% ao mês. Use o método bola de neve ou avalanche.",
-  "fii": "FIIs são ótimos para renda passiva mensal. Diversifique entre segmentos: logística, papel, shoppings, etc.",
-  "cdb": "CDBs de bancos médios costumam pagar mais que os grandes. Verifique a proteção do FGC (até R$ 250 mil).",
-  "ação": "Analise fundamentos (P/L, P/VP, DY) e não invista sem entender o negócio da empresa.",
-  "meta": "Defina metas SMART: específicas, mensuráveis, atingíveis, relevantes e com prazo.",
-}
+export const maxDuration = 30
+
+const HOURLY_LIMIT = 40
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -23,37 +20,84 @@ export async function GET() {
     where: { userId: session.user.id },
     orderBy: { createdAt: "desc" },
     take: 40,
-    select: { id: true, role: true, content: true },
+    select: { id: true, role: true, content: true, context: true },
   })
-  return NextResponse.json({ messages: rows.reverse() })
+  return NextResponse.json({
+    mode: aiConfigured() ? "ai" : "basic",
+    messages: rows.reverse().map((m) => ({
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      proposal: (m.context as any)?.proposal || null,
+    })),
+  })
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    const { message } = await req.json()
-
-    if (!message || typeof message !== "string") {
-      return NextResponse.json({ error: "Mensagem inválida" }, { status: 400 })
-    }
-
-    const lower = message.toLowerCase()
-    const fallback = Object.entries(responses).find(([k]) => lower.includes(k))
-    const responseText = fallback
-      ? fallback[1]
-      : `Analisei sua pergunta sobre "${message}". Recomendo monitorar seus gastos fixos e manter a reserva de emergência atualizada. Quer que eu detalhe algum ponto específico?`
-
-    if (session?.user?.id) {
-      await prisma.chatMessage.createMany({
-        data: [
-          { userId: session.user.id, role: "user", content: message },
-          { userId: session.user.id, role: "assistant", content: responseText },
-        ],
-      })
-    }
-
-    return NextResponse.json({ response: responseText })
-  } catch {
-    return NextResponse.json({ response: "Desculpe, ocorreu um erro. Tente novamente!" }, { status: 500 })
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
   }
+  const userId = session.user.id
+
+  const body = await req.json().catch(() => null)
+  const message = typeof body?.message === "string" ? body.message.trim() : ""
+  if (!message || message.length > 500) {
+    return NextResponse.json({ error: "Escreva uma mensagem de até 500 caracteres" }, { status: 400 })
+  }
+
+  // Per-user limit: protects the AI bill and the database.
+  const recent = await prisma.chatMessage.count({
+    where: { userId, role: "user", createdAt: { gte: new Date(Date.now() - 3_600_000) } },
+  })
+  if (recent >= HOURLY_LIMIT) {
+    return NextResponse.json({ error: "Muitas mensagens na última hora. Tente novamente mais tarde." }, { status: 429 })
+  }
+
+  const { ids } = await getScope(userId)
+  await syncDue(ids)
+
+  const categories = await prisma.category.findMany({
+    where: { OR: [{ isDefault: true }, { userId }] },
+    select: { id: true, name: true, type: true },
+  })
+  const todayIso = brToday().toISOString().slice(0, 10)
+
+  let reply: AssistantReply
+  let mode: "ai" | "basic" = "basic"
+  if (aiConfigured()) {
+    try {
+      const past = await prisma.chatMessage.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        take: 8,
+        select: { role: true, content: true },
+      })
+      reply = await aiReply({ ids, message, history: past.reverse(), todayIso, cats: categories })
+      mode = "ai"
+    } catch {
+      // AI unavailable (key invalid, quota, timeout): keep working in basic mode.
+      reply = await basicReply({ ids, message, todayIso, cats: categories })
+      reply.text = "(A IA está indisponível agora; respondi no modo básico.)\n" + reply.text
+    }
+  } else {
+    reply = await basicReply({ ids, message, todayIso, cats: categories })
+  }
+
+  await prisma.chatMessage.create({ data: { userId, role: "user", content: message } })
+  const saved = await prisma.chatMessage.create({
+    data: {
+      userId,
+      role: "assistant",
+      content: reply.text,
+      context: reply.proposal ? ({ proposal: reply.proposal } as any) : undefined,
+    },
+  })
+
+  return NextResponse.json({
+    response: reply.text,
+    messageId: saved.id,
+    proposal: reply.proposal || null,
+    mode,
+  })
 }

@@ -140,6 +140,24 @@ export default function DashboardPage() {
     return (v > 0) !== inverted ? "up" : "down"
   }
 
+  const insights: string[] = []
+  if (d && d.hasData) {
+    const ch = d.changes.expense
+    if (typeof ch === "number" && ch !== 0) {
+      insights.push(`Suas despesas ${ch > 0 ? "subiram" : "caíram"} ${Math.abs(ch)}% em relação ao período anterior.`)
+    }
+    if (d.categories[0] && d.expense > 0) {
+      insights.push(`Maior categoria de gasto: ${d.categories[0].name} (${d.categories[0].percent}% das despesas).`)
+    }
+    if (d.income > 0 && d.savingsRate !== null) {
+      insights.push(
+        d.savings >= 0
+          ? `Você guardou ${d.savingsRate}% da sua receita neste período.`
+          : "Neste período você gastou mais do que recebeu."
+      )
+    }
+  }
+
   const totalAllocation = d ? d.allocation.reduce((a: number, i: any) => a + i.value, 0) : 0
 
   return (
@@ -274,6 +292,27 @@ export default function DashboardPage() {
             />
           </div>
         </div>
+      )}
+
+      {insights.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Resumo do período</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <ul className="space-y-1.5 text-sm">
+              {insights.map((i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                  {i}
+                </li>
+              ))}
+            </ul>
+            <Link href="/assistant" className="inline-flex min-h-[44px] items-center text-sm font-medium text-primary">
+              Perguntar ao assistente →
+            </Link>
+          </CardContent>
+        </Card>
       )}
 
       {d && !d.hasData && (
