@@ -32,6 +32,7 @@ export async function GET() {
       currentAmount: Number(g.currentAmount),
       deadline: g.deadline,
       status: g.status,
+      isMine: g.userId === session.user.id,
     })),
   })
 }

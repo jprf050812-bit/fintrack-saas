@@ -40,9 +40,13 @@ export function TransactionList({ transactions }: TransactionListProps) {
           <div className="text-right">
             <p className={cn(
               "font-semibold text-sm",
-              t.type === "income" ? "text-green-600" : "text-red-600"
+              t.type === "transfer_in" || t.type === "transfer_out"
+                ? "text-indigo-600"
+                : t.type === "income"
+                ? "text-green-600"
+                : "text-red-600"
             )}>
-              {t.type === "income" ? "+" : "-"}{formatCurrency(t.amount)}
+              {t.type === "income" || t.type === "transfer_in" ? "+" : "-"}{formatCurrency(t.amount)}
             </p>
             <Badge variant="outline" className="text-[10px]">{t.category}</Badge>
           </div>

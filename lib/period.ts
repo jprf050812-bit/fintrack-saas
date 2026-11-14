@@ -30,7 +30,9 @@ const fmtBr = (d: Date) =>
 function parseDay(s?: string | null) {
   if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null
   const t = Date.parse(`${s}T00:00:00Z`)
-  return Number.isNaN(t) ? null : new Date(t)
+  if (Number.isNaN(t)) return null
+  const d = new Date(t)
+  return d.toISOString().slice(0, 10) === s ? d : null // rejects 2026-02-30 etc.
 }
 
 export function resolvePeriod(

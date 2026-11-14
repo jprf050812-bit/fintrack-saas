@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Modal } from "@/components/ui/modal"
 import { formatCurrency } from "@/lib/utils"
-import { Plus, AlertTriangle } from "lucide-react"
+import { Plus, AlertTriangle, Pencil, Trash2 } from "lucide-react"
 
 interface Budget {
   id: string
@@ -17,6 +17,8 @@ interface Budget {
   amount: number
   spent: number
   category: string | null
+  categoryId: string | null
+  isMine: boolean
 }
 
 interface Category {
@@ -33,6 +35,8 @@ export default function BudgetsPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [form, setForm] = useState({ name: "", amount: "", categoryId: "" })
+  const [editing, setEditing] = useState<Budget | null>(null)
+  const [notice, setNotice] = useState("")
 
   const loadData = async () => {
     setLoading(true)
@@ -56,35 +60,68 @@ export default function BudgetsPage() {
       return
     }
     setSaving(true)
-    const res = await fetch("/api/budgets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: form.name,
-        amount: Number(form.amount),
-        categoryId: form.categoryId || undefined,
-      }),
-    })
-    const data = await res.json()
-    setSaving(false)
-    if (!res.ok) {
-      setError(data.error || "Erro ao criar orçamento")
-      return
+    try {
+      const res = await fetch(editing ? `/api/budgets/${editing.id}` : "/api/budgets", {
+        method: editing ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          editing
+            ? { name: form.name, amount: Number(form.amount), categoryId: form.categoryId || null }
+            : { name: form.name, amount: Number(form.amount), categoryId: form.categoryId || undefined }
+        ),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error || "Erro ao salvar orçamento")
+        return
+      }
+      setModalOpen(false)
+      setNotice(editing ? "Orçamento atualizado." : "Orçamento criado.")
+      setEditing(null)
+      setForm({ name: "", amount: "", categoryId: "" })
+      loadData()
+    } catch {
+      setError("Sem conexão. Nada foi salvo.")
+    } finally {
+      setSaving(false)
     }
-    setModalOpen(false)
+  }
+
+  const openNew = () => {
+    setEditing(null)
     setForm({ name: "", amount: "", categoryId: "" })
-    loadData()
+    setError("")
+    setModalOpen(true)
+  }
+
+  const openEdit = (b: Budget) => {
+    setEditing(b)
+    setForm({ name: b.name, amount: String(b.amount), categoryId: b.categoryId || "" })
+    setError("")
+    setModalOpen(true)
+  }
+
+  const handleDelete = async (b: Budget) => {
+    if (!confirm(`Excluir o orçamento "${b.name}"? Suas transações não serão afetadas.`)) return
+    const res = await fetch(`/api/budgets/${b.id}`, { method: "DELETE" })
+    const data = await res.json().catch(() => ({}))
+    setNotice(res.ok ? "Orçamento excluído." : data.error || "Não foi possível excluir.")
+    if (res.ok) loadData()
   }
 
   return (
     <div className="space-y-6 pb-20 md:pb-0">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Orçamentos</h1>
-        <Button onClick={() => setModalOpen(true)}>
+        <Button onClick={openNew} className="h-11">
           <Plus className="mr-2 h-4 w-4" />
           Novo Orçamento
         </Button>
       </div>
+
+      {notice && (
+        <div role="status" className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{notice}</div>
+      )}
 
       {loading ? (
         <p className="text-muted-foreground text-center py-10">Carregando...</p>
@@ -106,8 +143,16 @@ export default function BudgetsPage() {
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base">{b.name}</CardTitle>
-                    {isOver && <Badge variant="destructive">Estourado</Badge>}
-                    {isWarning && <Badge variant="secondary"><AlertTriangle className="h-3 w-3 mr-1" />Atenção</Badge>}
+                    <div className="flex items-center gap-1">
+                      {isOver && <Badge variant="destructive">Estourado</Badge>}
+                      {isWarning && <Badge variant="secondary"><AlertTriangle className="h-3 w-3 mr-1" />Atenção</Badge>}
+                      {b.isMine && (
+                        <>
+                          <button onClick={() => openEdit(b)} aria-label={`Editar ${b.name}`} className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-500 active:bg-gray-100 dark:active:bg-gray-700"><Pencil className="h-4 w-4" /></button>
+                          <button onClick={() => handleDelete(b)} aria-label={`Excluir ${b.name}`} className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-500 active:bg-gray-100 dark:active:bg-gray-700"><Trash2 className="h-4 w-4" /></button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -139,7 +184,7 @@ export default function BudgetsPage() {
         </div>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Novo Orçamento">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "Editar Orçamento" : "Novo Orçamento"}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Nome</label>
@@ -147,7 +192,7 @@ export default function BudgetsPage() {
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Valor Mensal (R$)</label>
-            <Input type="number" step="0.01" min="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+            <Input type="number" inputMode="decimal" step="0.01" min="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Categoria vinculada</label>
@@ -161,7 +206,7 @@ export default function BudgetsPage() {
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <Button type="submit" className="w-full" disabled={saving}>
-            {saving ? "Salvando..." : "Criar Orçamento"}
+            {saving ? "Salvando..." : editing ? "Salvar alterações" : "Criar Orçamento"}
           </Button>
         </form>
       </Modal>

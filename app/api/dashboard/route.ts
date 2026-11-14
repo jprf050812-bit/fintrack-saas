@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { getScope } from "@/lib/scope"
 import { resolvePeriod, buildBuckets, bucketKey } from "@/lib/period"
+import { syncDue } from "@/lib/finance"
 
 // null when there is nothing to compare against (never invent a percentage).
 function pctChange(current: number, previous: number): number | null {
@@ -17,6 +18,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
   }
   const { ids, shared } = await getScope(session.user.id)
+  await syncDue(ids)
 
   const sp = req.nextUrl.searchParams
   const period = resolvePeriod(sp.get("range"), sp.get("from"), sp.get("to"))
@@ -147,8 +149,8 @@ export async function GET(req: NextRequest) {
       amount: Number(t.amount),
       type: t.type,
       date: t.date,
-      category: t.category?.name || "Sem categoria",
-      categoryColor: t.category?.color || "#6b7280",
+      category: t.type.startsWith("transfer") ? "Transferência" : t.category?.name || "Sem categoria",
+      categoryColor: t.type.startsWith("transfer") ? "#6366f1" : t.category?.color || "#6b7280",
       isMine: t.userId === session.user.id,
       owner: shared ? t.user?.name || "Parceiro(a)" : null,
     })),

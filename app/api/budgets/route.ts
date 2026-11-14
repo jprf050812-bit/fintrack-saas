@@ -52,6 +52,8 @@ export async function GET() {
     spent: b.categoryId ? spentByCategory.get(b.categoryId) || 0 : 0,
     period: b.period,
     category: b.category?.name || null,
+    categoryId: b.categoryId,
+    isMine: b.userId === session.user.id,
   }))
 
   return NextResponse.json({ budgets: result })

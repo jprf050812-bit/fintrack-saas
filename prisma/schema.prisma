@@ -20,6 +20,7 @@ model User {
   wallets       Wallet[]
   sharedWallets SharedWalletMember[]
   transactions  Transaction[]
+  recurringRules RecurringRule[]
   investments   Investment[]
   budgets       Budget[]
   goals         Goal[]
@@ -147,10 +148,40 @@ model Transaction {
   isRecurring    Boolean       @default(false)
   recurringFreq  String?
 
+  paymentMethod      String?
+  notes              String?
+  installmentGroupId String?
+  installmentNumber  Int?
+  installmentTotal   Int?
+  transferGroupId    String?
+  recurringRuleId    String?
+
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
   @@map("transactions")
+}
+
+model RecurringRule {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type          String
+  amount        Decimal   @db.Decimal(15, 2)
+  description   String?
+  categoryId    String?
+  walletId      String?
+  paymentMethod String?
+  notes         String?
+  frequency     String
+  nextDate      DateTime
+  endDate       DateTime?
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId, active, nextDate])
+  @@map("recurring_rules")
 }
 
 model Investment {
