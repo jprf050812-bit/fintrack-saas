@@ -13,6 +13,7 @@ import {
   BarChart3,
   Settings,
   Heart,
+  Bot,
   LogOut,
 } from "lucide-react"
 
@@ -24,6 +25,7 @@ const navItems = [
   { href: "/goals", label: "Metas", icon: Target },
   { href: "/reports", label: "Relatórios", icon: BarChart3 },
   { href: "/couple", label: "Modo Casal", icon: Heart },
+  { href: "/assistant", label: "Assistente IA", icon: Bot },
   { href: "/settings", label: "Configurações", icon: Settings },
 ]
 

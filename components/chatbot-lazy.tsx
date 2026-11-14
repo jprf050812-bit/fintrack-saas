@@ -8,5 +8,10 @@ const Chatbot = dynamic(() => import("@/components/chatbot").then((m) => m.Chatb
 })
 
 export function ChatbotLazy() {
-  return <Chatbot />
+  // On phones the assistant lives in its own tab, so the floating bubble is desktop-only.
+  return (
+    <div className="hidden md:block">
+      <Chatbot />
+    </div>
+  )
 }

@@ -64,6 +64,23 @@ export default function TransactionsPage() {
     loadData()
   }, [])
 
+  // Open the "new transaction" form from the mobile quick-add button or a
+  // home-screen shortcut (/transactions?new=expense|income).
+  useEffect(() => {
+    const openNew = (type: string) => {
+      setForm((f) => ({ ...f, type: type === "income" ? "income" : "expense" }))
+      setModalOpen(true)
+    }
+    const param = new URLSearchParams(window.location.search).get("new")
+    if (param === "expense" || param === "income") {
+      openNew(param)
+      window.history.replaceState(null, "", "/transactions")
+    }
+    const onEvent = (e: Event) => openNew((e as CustomEvent).detail?.type)
+    window.addEventListener("fintrack:new-transaction", onEvent)
+    return () => window.removeEventListener("fintrack:new-transaction", onEvent)
+  }, [])
+
   const filtered = transactions.filter((t) => {
     const desc = (t.description || "").toLowerCase()
     const matchesSearch = desc.includes(search.toLowerCase()) || t.category.toLowerCase().includes(search.toLowerCase())
@@ -244,6 +261,7 @@ export default function TransactionsPage() {
               <label className="text-sm font-medium">Valor (R$)</label>
               <Input
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0"
                 value={form.amount}

@@ -10,5 +10,6 @@ export const config = {
     "/reports/:path*",
     "/couple/:path*",
     "/settings/:path*",
+    "/assistant/:path*",
   ],
 }

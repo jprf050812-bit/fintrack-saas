@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { User, Bell, Shield } from "lucide-react"
+import Link from "next/link"
+import { User, Bell, Shield, PiggyBank, Target, BarChart3, Heart, ChevronRight } from "lucide-react"
 
 export default function SettingsPage() {
   const [name, setName] = useState("")
@@ -66,6 +67,31 @@ export default function SettingsPage() {
       <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Configurações</h1>
 
       <div className="grid gap-6 max-w-2xl">
+        <Card className="md:hidden">
+          <CardHeader>
+            <CardTitle className="text-base">Mais seções</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {[
+              { href: "/budgets", label: "Orçamentos", icon: PiggyBank },
+              { href: "/goals", label: "Metas", icon: Target },
+              { href: "/reports", label: "Relatórios", icon: BarChart3 },
+              { href: "/couple", label: "Modo Casal", icon: Heart },
+            ].map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                className="flex min-h-[52px] items-center justify-between border-t px-4 active:bg-gray-100 dark:active:bg-gray-700"
+              >
+                <span className="flex items-center gap-3 text-sm font-medium">
+                  <l.icon className="h-5 w-5 text-primary" />
+                  {l.label}
+                </span>
+                <ChevronRight className="h-4 w-4 text-gray-400" />
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

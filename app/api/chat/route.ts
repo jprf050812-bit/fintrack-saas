@@ -14,6 +14,20 @@ const responses: Record<string, string> = {
   "meta": "Defina metas SMART: específicas, mensuráveis, atingíveis, relevantes e com prazo.",
 }
 
+export async function GET() {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
+  }
+  const rows = await prisma.chatMessage.findMany({
+    where: { userId: session.user.id },
+    orderBy: { createdAt: "desc" },
+    take: 40,
+    select: { id: true, role: true, content: true },
+  })
+  return NextResponse.json({ messages: rows.reverse() })
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
